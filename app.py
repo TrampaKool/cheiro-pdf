@@ -22,7 +22,6 @@ uploaded_files = st.file_uploader(
 )
 
 if uploaded_files:
-    print(API_KEY);
     st.info(f"Loaded {len(uploaded_files)} images.")
     
     if st.button("Start Transcription"):
