@@ -8,6 +8,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import io
 from reportlab.pdfbase.pdfmetrics import stringWidth
+import random
 
 MAX_WIDTH = 500  # Total pdf width in points
 
@@ -53,21 +54,34 @@ if uploaded_files:
             # Convert uploaded file to bytes for the API
             img_bytes = file.read()
             
-            # Call Gemini API
-            try:
-                response = client.models.generate_content(
-                    model="gemini-3.1-flash-lite-preview",
-                    contents=[
-                        "Transcribe this handwritten Greek text.",
-                        {"inline_data": {"data": img_bytes, "mime_type": "image/jpeg"}}
-                    ]
-                )
-                all_text.append(response.text)
-            except Exception as e:
-                st.error(f"Error on page {i+1}: {e}")
-            
-            # Throttling to stay in Free Tier (approx 10 requests per minute)
-            time.sleep(6)
+            # --- API CALL WITH RETRY & BACKOFF ---
+            max_retries = 5
+            success = False
+            response_text = ""
+
+            for attempt in range(max_retries):
+                try:
+                    response = client.models.generate_content(
+                        model="gemini-3.1-flash-lite-preview",
+                        contents=[
+                            "Transcribe this handwritten Greek text.",
+                            {"inline_data": {"data": img_bytes, "mime_type": "image/jpeg"}}
+                        ]
+                    )
+                    response_text = response.text
+                    success = True
+                    break # Exit retry loop on success
+                
+                except Exception as e:
+                    # Exponential backoff: 2, 4, 8, 16, 32 seconds + jitter
+                    wait_time = (2 ** attempt) + random.uniform(0, 1)
+                    status_text.warning(f"Rate limited. Retrying in {wait_time:.1f}s... (Attempt {attempt+1}/{max_retries})")
+                    time.sleep(wait_time)
+
+            if success:
+                all_text.append(response_text)
+            else:
+                all_text.append(f"[Error: Could not transcribe image {i+1}]")
 
         status_text.success("All images processed!")
         print(f"Server-side: {all_text}")
