@@ -65,7 +65,7 @@ if uploaded_files:
                     response = client.models.generate_content(
                         model="gemini-3.1-flash-lite-preview",
                         contents=[
-                            "Transcribe this handwritten Greek text.",
+                            "Transcribe the handwritten Greek text exactly. Preserve line breaks. Do not translate. Return only the transcription.",
                             {"inline_data": {"data": img_bytes, "mime_type": "image/jpeg"}}
                         ]
                     )
@@ -80,7 +80,7 @@ if uploaded_files:
                     # Exponential backoff: 2, 4, 8, 16, 32 seconds + jitter
 
                     wait_time = (2 ** retry_count) + random.uniform(0, 1)
-                    status_text.warning(f"Rate limited. Retrying in {wait_time:.1f}s... (Attempt {retry_count+1}/{max_retries})")
+                    status_text.warning(f"Rate limited. Retrying in {wait_time:.1f}s... (Attempt {retry_count}/{max_retries})")
                     time.sleep(wait_time)
 
             if success:
