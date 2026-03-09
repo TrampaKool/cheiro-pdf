@@ -56,10 +56,11 @@ if uploaded_files:
             
             # --- API CALL WITH RETRY & BACKOFF ---
             max_retries = 5
+            retry_count = 0
             success = False
             response_text = ""
 
-            for attempt in range(max_retries):
+            while retry_count < max_retries and not success:
                 try:
                     response = client.models.generate_content(
                         model="gemini-3.1-flash-lite-preview",
@@ -73,9 +74,13 @@ if uploaded_files:
                     break # Exit retry loop on success
                 
                 except Exception as e:
+                    error_msg = str(e)
+                    retry_count += 1
+                    print(error_msg)
                     # Exponential backoff: 2, 4, 8, 16, 32 seconds + jitter
-                    wait_time = (2 ** attempt) + random.uniform(0, 1)
-                    status_text.warning(f"Rate limited. Retrying in {wait_time:.1f}s... (Attempt {attempt+1}/{max_retries})")
+
+                    wait_time = (2 ** retry_count) + random.uniform(0, 1)
+                    status_text.warning(f"Rate limited. Retrying in {wait_time:.1f}s... (Attempt {retry_count+1}/{max_retries})")
                     time.sleep(wait_time)
 
             if success:
