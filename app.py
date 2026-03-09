@@ -3,6 +3,10 @@ from google import genai
 import time
 from dotenv import load_dotenv
 import os
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import io
 
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
@@ -16,6 +20,14 @@ st.write("Upload your notes, and convert them to an editable PDF.")
 if not API_KEY:
     st.error("API Key not found! Check your .env file.")
     st.stop()
+
+# Register a font that supports Greek (Must have the .ttf file in your folder)
+try:
+    pdfmetrics.registerFont(TTFont('GreekFont', 'DejaVuSans.ttf'))
+    FONT_NAME = 'GreekFont'
+except:
+    st.warning("Greek font not found. Using default (may show boxes in PDF).")
+    FONT_NAME = 'Helvetica'
 
 uploaded_files = st.file_uploader(
     "Choose images...", type=["jpg", "jpeg", "png"], accept_multiple_files=True
@@ -56,3 +68,34 @@ if uploaded_files:
 
         status_text.success("All images processed!")
         print(f"Server-side: {all_text}")
+
+        # --- PDF GENERATION ---
+        pdf_buffer = io.BytesIO()
+        c = canvas.Canvas(pdf_buffer)
+        
+        # Simple PDF assembly
+        y_position = 800
+        c.setFont(FONT_NAME, 12)
+        
+        for text in all_text:
+            lines = text.split('\n')
+            for line in lines:
+                if y_position < 50: # New page if we run out of space
+                    c.showPage()
+                    c.setFont(FONT_NAME, 12)
+                    y_position = 800
+                c.drawString(50, y_position, line)
+                y_position -= 15
+            c.showPage() # Each image gets its own page
+            y_position = 800
+
+        c.save()
+        pdf_buffer.seek(0)
+
+        # --- DOWNLOAD BUTTON ---
+        st.download_button(
+            label="📩 Download Transcribed PDF",
+            data=pdf_buffer,
+            file_name="transcribed_greek.pdf",
+            mime="application/pdf"
+        )
