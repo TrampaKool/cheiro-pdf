@@ -7,6 +7,9 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import io
+from reportlab.pdfbase.pdfmetrics import stringWidth
+
+MAX_WIDTH = 500  # Total pdf width in points
 
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
@@ -80,13 +83,34 @@ if uploaded_files:
         for text in all_text:
             lines = text.split('\n')
             for line in lines:
-                if y_position < 50: # New page if we run out of space
-                    c.showPage()
-                    c.setFont(FONT_NAME, 12)
-                    y_position = 800
-                c.drawString(50, y_position, line)
+                current_line = ""
+                words = line.split(' ')
+    
+                for word in words:
+                    # Check if adding the next word exceeds our MAX_WIDTH
+                    test_line = f"{current_line} {word}".strip()
+                    width = stringWidth(test_line, FONT_NAME, 12)
+                    
+                    if width < MAX_WIDTH:
+                        current_line = test_line
+                    else:
+                        # The line is full! Print it and start a new one
+                        c.drawString(50, y_position, current_line)
+                        y_position -= 15
+                        current_line = word
+                        
+                        # Check for page break
+                        if y_position < 50:
+                            c.showPage()
+                            c.setFont(FONT_NAME, 12)
+                            y_position = 800
+                            
+                # Draw the final leftover piece of the line
+                c.drawString(50, y_position, current_line)
                 y_position -= 15
-            c.showPage() # Each image gets its own page
+
+            c.showPage()
+            c.setFont(FONT_NAME, 12)
             y_position = 800
 
         c.save()
