@@ -38,6 +38,7 @@ uploaded_files = st.file_uploader(
     "Choose images...", type=["jpg", "jpeg", "png"], accept_multiple_files=True
 )
 sorted_files = natsorted(uploaded_files, key=lambda x: x.name)
+missed_pages = []
 
 if sorted_files:
     st.info(f"Loaded {len(sorted_files)} images.")
@@ -88,10 +89,15 @@ if sorted_files:
             if success:
                 all_text.append(response_text)
             else:
-                all_text.append(f"[Error: Could not transcribe image {i+1}]")
+                missed_pages.append(file.name)
+                all_text.append(f"[Error: Could not transcribe image {i+1} Name: {file.name}]")
 
-        status_text.success("All images processed!")
-        print(f"Server-side: {all_text}")
+        if (len(missed_pages) > 0):
+            status_text.warning(f"Pages that failed to process: {",".join(missed_pages)}")
+        else:
+            status_text.success("All images processed!")
+        
+        
 
         # --- PDF GENERATION ---
         pdf_buffer = io.BytesIO()
