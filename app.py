@@ -55,7 +55,7 @@ if uploaded_files:
             img_bytes = file.read()
             
             # --- API CALL WITH RETRY & BACKOFF ---
-            max_retries = 5
+            max_retries = 7
             retry_count = 0
             success = False
             response_text = ""
@@ -79,7 +79,7 @@ if uploaded_files:
                     print(error_msg)
                     # Exponential backoff: 2, 4, 8, 16, 32 seconds + jitter
 
-                    wait_time = (2 ** retry_count) + random.uniform(0, 1)
+                    wait_time = min((2 ** retry_count) + random.uniform(0, 1), 8)
                     status_text.warning(f"Rate limited. Retrying in {wait_time:.1f}s... (Attempt {retry_count}/{max_retries})")
                     time.sleep(wait_time)
 
