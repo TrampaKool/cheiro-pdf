@@ -9,6 +9,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 import io
 from reportlab.pdfbase.pdfmetrics import stringWidth
 import random
+from natsort import natsorted
 
 MAX_WIDTH = 500  # Total pdf width in points
 
@@ -36,20 +37,21 @@ except:
 uploaded_files = st.file_uploader(
     "Choose images...", type=["jpg", "jpeg", "png"], accept_multiple_files=True
 )
+sorted_files = natsorted(uploaded_files, key=lambda x: x.name)
 
-if uploaded_files:
-    st.info(f"Loaded {len(uploaded_files)} images.")
+if sorted_files:
+    st.info(f"Loaded {len(sorted_files)} images.")
     
     if st.button("Start Transcription"):
         all_text = []
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        for i, file in enumerate(uploaded_files):
+        for i, file in enumerate(sorted_files):
             # Update UI
-            percent = (i + 1) / len(uploaded_files)
+            percent = (i + 1) / len(sorted_files)
             progress_bar.progress(percent)
-            status_text.text(f"Processing image {i+1} of {len(uploaded_files)}...")
+            status_text.text(f"Processing image {i+1} of {len(sorted_files)}...")
 
             # Convert uploaded file to bytes for the API
             img_bytes = file.read()
