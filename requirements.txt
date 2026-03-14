@@ -3,3 +3,4 @@ google
 natsort
 dotenv
 reportlab
+python-docx

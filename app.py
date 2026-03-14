@@ -10,6 +10,10 @@ import io
 from reportlab.pdfbase.pdfmetrics import stringWidth
 import random
 from natsort import natsorted
+from docx import Document as DocxDocument
+from docx.shared import Pt, Inches
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 
 MAX_WIDTH = 500  # Total pdf width in points
 
@@ -42,6 +46,10 @@ missed_pages = []
 
 if sorted_files:
     st.info(f"Loaded {len(sorted_files)} images.")
+
+     # --- OUTPUT FORMAT SELECTOR ---
+    use_docx = st.toggle("Export as DOCX", value=False)
+    output_format = "DOCX" if use_docx else "PDF"
     
     if st.button("Start Transcription"):
         all_text = []
@@ -87,7 +95,7 @@ if sorted_files:
                     time.sleep(wait_time)
 
             if success:
-                all_text.append(response_text)
+                all_text.append(response.text or "")
             else:
                 missed_pages.append(file.name)
                 all_text.append(f"[Error: Could not transcribe image {i+1} Name: {file.name}]")
@@ -98,55 +106,102 @@ if sorted_files:
             status_text.success("All images processed!")
         
         
-
-        # --- PDF GENERATION ---
-        pdf_buffer = io.BytesIO()
-        c = canvas.Canvas(pdf_buffer)
-        
-        # Simple PDF assembly
-        y_position = 800
-        c.setFont(FONT_NAME, 12)
-        
-        for text in all_text:
-            lines = text.split('\n')
-            for line in lines:
-                current_line = ""
-                words = line.split(' ')
-    
-                for word in words:
-                    # Check if adding the next word exceeds our MAX_WIDTH
-                    test_line = f"{current_line} {word}".strip()
-                    width = stringWidth(test_line, FONT_NAME, 12)
-                    
-                    if width < MAX_WIDTH:
-                        current_line = test_line
-                    else:
-                        # The line is full! Print it and start a new one
-                        c.drawString(50, y_position, current_line)
-                        y_position -= 15
-                        current_line = word
-                        
-                        # Check for page break
-                        if y_position < 50:
-                            c.showPage()
-                            c.setFont(FONT_NAME, 12)
-                            y_position = 800
-                            
-                # Draw the final leftover piece of the line
-                c.drawString(50, y_position, current_line)
-                y_position -= 15
-
-            c.showPage()
-            c.setFont(FONT_NAME, 12)
+        if output_format == "PDF":
+            # --- PDF GENERATION ---
+            pdf_buffer = io.BytesIO()
+            c = canvas.Canvas(pdf_buffer)
+            
+            # Simple PDF assembly
             y_position = 800
+            c.setFont(FONT_NAME, 12)
+            
+            for text in all_text:
+                lines = text.split('\n')
+                for line in lines:
+                    current_line = ""
+                    words = line.split(' ')
+        
+                    for word in words:
+                        # Check if adding the next word exceeds our MAX_WIDTH
+                        test_line = f"{current_line} {word}".strip()
+                        width = stringWidth(test_line, FONT_NAME, 12)
+                        
+                        if width < MAX_WIDTH:
+                            current_line = test_line
+                        else:
+                            # The line is full! Print it and start a new one
+                            c.drawString(50, y_position, current_line)
+                            y_position -= 15
+                            current_line = word
+                            
+                            # Check for page break
+                            if y_position < 50:
+                                c.showPage()
+                                c.setFont(FONT_NAME, 12)
+                                y_position = 800
+                                
+                    # Draw the final leftover piece of the line
+                    c.drawString(50, y_position, current_line)
+                    y_position -= 15
 
-        c.save()
-        pdf_buffer.seek(0)
+                c.showPage()
+                c.setFont(FONT_NAME, 12)
+                y_position = 800
 
-        # --- DOWNLOAD BUTTON ---
-        st.download_button(
-            label="📩 Download Transcribed PDF",
-            data=pdf_buffer,
-            file_name="transcribed_greek.pdf",
-            mime="application/pdf"
-        )
+            c.save()
+            pdf_buffer.seek(0)
+
+            # --- DOWNLOAD BUTTON ---
+            st.download_button(
+                label="📩 Download Transcribed PDF",
+                data=pdf_buffer,
+                file_name="transcribed_greek.pdf",
+                mime="application/pdf"
+            )
+
+        # -------------------------------------------------------
+        # --- DOCX GENERATION -----------------------------------
+        # -------------------------------------------------------
+        else:
+            doc = DocxDocument()
+ 
+            # Set default font to one that supports Greek (DejaVu Sans or fallback)
+            style = doc.styles['Normal']
+            font = style.font
+            font.name = 'DejaVu Sans'
+            font.size = Pt(12)
+ 
+            # Helper: add a page break paragraph between pages
+            def add_page_break(document):
+                paragraph = document.add_paragraph()
+                run = paragraph.runs[0] if paragraph.runs else paragraph.add_run()
+                br = OxmlElement('w:br')
+                br.set(qn('w:type'), 'page')
+                run._r.append(br)
+ 
+            for page_index, text in enumerate(all_text):
+
+                lines = text.split('\n')
+ 
+                for line_index, line in enumerate(lines):
+                    paragraph = doc.add_paragraph()
+                    run = paragraph.add_run(line)
+                    run.font.name = 'DejaVu Sans'
+                    run.font.size = Pt(12)
+ 
+                # After each image's text block, insert a page break
+                # (except after the very last page to avoid a trailing blank page)
+                if page_index < len(all_text) - 1:
+                    add_page_break(doc)
+ 
+            docx_buffer = io.BytesIO()
+            doc.save(docx_buffer)
+            docx_buffer.seek(0)
+ 
+            # --- DOWNLOAD BUTTON ---
+            st.download_button(
+                label="📩 Download Transcribed DOCX",
+                data=docx_buffer,
+                file_name="transcribed_greek.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
